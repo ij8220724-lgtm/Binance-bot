@@ -5,15 +5,16 @@ import hashlib
 import requests
 from fastapi import FastAPI
 from threading import Thread
+import uvicorn
 
 app = FastAPI()
 
 # ==========================================
-# [사용자 설정 영역] 본인 정보로 채워주세요!
+# [사용자 설정 영역] 본인 정보 확인!
 # ==========================================
-API_KEY = 'c9VMqfaLyimfqWmZhJ4CNfZ9VD0Jk1dCONE16ehdZAWHsQn5T3KStrraSb6hDMVP'
-SECRET_KEY = 'gn4c2frizi1qL2kKxHsiurHoq5i1xfO9wrgeI34ylBDzawng0DSSSIHxumvDuPb4'
-GOOGLE_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbztM4AS5Zas7l6-Bt-9IDu-84peShTUUa1kqSWzSZHPLZ3INDNtLRV648r2ffOiU_wC-w/exec'
+API_KEY = '여기에_바이낸스_읽기전용_API_키_입력'
+SECRET_KEY = '여기에_바이낸스_시크릿_키_입력'
+GOOGLE_WEBHOOK_URL = '여기에_구글_웹앱_URL_입력'
 # ==========================================
 
 BASE_URL = 'https://fapi.binance.com'
@@ -30,7 +31,6 @@ def get_signature(query_string):
     ).hexdigest()
 
 def check_binance_trades():
-    # 24시간 백그라운드에서 돌면서 주기적으로 바이낸스 확인
     last_checked_time = 0
     
     while True:
@@ -46,28 +46,28 @@ def check_binance_trades():
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 trades = response.json()
-                # 여기에 최신 거래를 감지해서 구글 시트로 쏘는 로직이 들어갑니다.
-                # (테스트용 기본 구조)
                 for trade in trades:
                     if trade['time'] > last_checked_time:
                         trade_data = {
                             "symbol": trade.get("symbol"),
-                            "side": "BUY" if trade.get("buyer") else "SELL", # 예시
+                            "side": "BUY" if trade.get("buyer") else "SELL",
                             "price": trade.get("price"),
                             "qty": trade.get("qty")
                         }
-                        # 구글 시트 웹앱으로 전송
                         requests.post(GOOGLE_WEBHOOK_URL, json=trade_data)
                         last_checked_time = trade['time']
         except Exception as e:
             print(f"백그라운드 에러 발생: {e}")
             
-        # 30초마다 체크 (실시간에 가깝게 작동)
         time.sleep(30)
 
-# 서버가 켜질 때 백그라운드 스레드에서 봇 작동 시작
 @app.on_event("startup")
 def startup_event():
     thread = Thread(target=check_binance_trades)
     thread.daemon = True
     thread.start()
+
+# Render 포트 바인딩을 완벽하게 잡아주는 핵심 구동부
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
